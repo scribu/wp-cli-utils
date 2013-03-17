@@ -10,6 +10,8 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"path"
+	"strings"
 )
 
 var WP_CLI_PATH string
@@ -49,11 +51,29 @@ func decodeJSON(out bytes.Buffer) Command {
 	return c
 }
 
+func getManSrc(cmd_path string) string {
+	cmd_path = strings.Replace(cmd_path, " ", "-", -1)
+	cmd_path = strings.Replace(cmd_path, "-wp-", "", 1)
+
+	f, err := os.Open(path.Join(WP_CLI_PATH, "man-src", cmd_path + ".txt"))
+	if err != nil {
+		return ""
+	}
+
+	var b bytes.Buffer
+	b.ReadFrom(f)
+	f.Close()
+
+	return b.String()
+}
+
 func handleCommand(cmd Command, path string) {
 	full_path := path + " " + cmd.Name
 
-	if len(cmd.Subcommands) == 0 {
-		fmt.Println(full_path + " " + cmd.Synopsis)
+	manSrc := getManSrc(full_path)
+
+	if "" != manSrc {
+		fmt.Println(manSrc)
 	} else {
 		for _, subcmd := range cmd.Subcommands {
 			handleCommand(subcmd, full_path)
