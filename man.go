@@ -49,8 +49,16 @@ func decodeJSON(out bytes.Buffer) Command {
 	return c
 }
 
-func handleCommand(cmd Command) {
-	fmt.Println(cmd.Subcommands)
+func handleCommand(cmd Command, path string) {
+	full_path := path + " " + cmd.Name
+
+	if len(cmd.Subcommands) == 0 {
+		fmt.Println(full_path + " " + cmd.Synopsis)
+	} else {
+		for _, subcmd := range cmd.Subcommands {
+			handleCommand(subcmd, full_path)
+		}
+	}
 }
 
 func main() {
@@ -60,5 +68,5 @@ func main() {
 
 	WP_CLI_PATH = os.Args[1]
 
-	handleCommand(decodeJSON(getCommandsAsJSON()))
+	handleCommand(decodeJSON(getCommandsAsJSON()), "")
 }
