@@ -20,6 +20,22 @@ type Command struct {
 	Subcommands                 []Command
 }
 
+func callRonn(input string) string {
+	cmd := exec.Command("ronn", "--date=2012-01-01 --roff --manual='WP-CLI'")
+
+	cmd.Stdin = strings.NewReader(input)
+
+	var out bytes.Buffer
+	cmd.Stdout = &out
+
+	err := cmd.Run()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	return out.String()
+}
+
 func getCommandsAsJSON() bytes.Buffer {
 	cmd := exec.Command(WP_CLI_PATH+"/bin/wp", "--cmd-dump")
 
@@ -90,8 +106,8 @@ func handleCommand(cmd Command, path string) {
 	manSrc := getManSrc(full_path)
 
 	if "" != manSrc {
-		// TODO: run through ronn etc
-		writeMan(manSrc, full_path)
+		roff := strings.Replace(callRonn(manSrc), " \"January 2012\"", "", -1)
+		writeMan(roff, full_path)
 		log.Println("generated" + full_path)
 	} else {
 		for _, subcmd := range cmd.Subcommands {
