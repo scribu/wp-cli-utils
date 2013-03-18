@@ -74,8 +74,8 @@ func convertPath(cmd_path string) string {
 }
 
 func getManSrc(cmd_path string) string {
-
-	f, err := os.Open(path.Join(WP_CLI_PATH, "man-src", convertPath(cmd_path)+".txt"))
+	src_path := path.Join(WP_CLI_PATH, "man-src", convertPath(cmd_path)+".txt")
+	f, err := os.Open(src_path)
 	if err != nil {
 		return ""
 	}
