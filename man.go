@@ -5,7 +5,6 @@ package main
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"io"
 	"log"
 	"os"
@@ -51,11 +50,16 @@ func decodeJSON(out bytes.Buffer) Command {
 	return c
 }
 
-func getManSrc(cmd_path string) string {
+func convertPath(cmd_path string) string {
 	cmd_path = strings.Replace(cmd_path, " ", "-", -1)
 	cmd_path = strings.Replace(cmd_path, "-wp-", "", 1)
 
-	f, err := os.Open(path.Join(WP_CLI_PATH, "man-src", cmd_path + ".txt"))
+	return cmd_path
+}
+
+func getManSrc(cmd_path string) string {
+
+	f, err := os.Open(path.Join(WP_CLI_PATH, "man-src", convertPath(cmd_path)+".txt"))
 	if err != nil {
 		return ""
 	}
@@ -67,13 +71,28 @@ func getManSrc(cmd_path string) string {
 	return b.String()
 }
 
+func writeMan(contents, cmd_path string) {
+	final_path := path.Join(WP_CLI_PATH, "man", convertPath(cmd_path)+".1")
+	f, err := os.Create(final_path)
+	if err != nil {
+		log.Fatal("can't create ", final_path)
+	}
+
+	_, err = f.Write([]byte(contents))
+	if err != nil {
+		panic(err)
+	}
+}
+
 func handleCommand(cmd Command, path string) {
 	full_path := path + " " + cmd.Name
 
 	manSrc := getManSrc(full_path)
 
 	if "" != manSrc {
-		fmt.Println(manSrc)
+		// TODO: run through ronn etc
+		writeMan(manSrc, full_path)
+		log.Println("generated" + full_path)
 	} else {
 		for _, subcmd := range cmd.Subcommands {
 			handleCommand(subcmd, full_path)
