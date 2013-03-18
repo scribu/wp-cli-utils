@@ -4,116 +4,46 @@ package main
 
 import (
 	"bytes"
-	"encoding/json"
-	"io"
 	"log"
 	"os"
 	"os/exec"
 	"path"
+	"path/filepath"
 	"strings"
 )
 
 var WP_CLI_PATH string
 
-type Command struct {
-	Name, Synopsis, Description string
-	Subcommands                 []Command
+func convertPath(cmd_path string) []string {
+	cmd_path = strings.Replace(path.Base(cmd_path), ".txt", "", 1)
+
+	return strings.Split(cmd_path, "-")
 }
 
-func callRonn(input string) string {
-	cmd := exec.Command("ronn", "--date=2012-01-01 --roff --manual='WP-CLI'")
+func generateMan(src_path string, f os.FileInfo, err error) error {
+	if !strings.HasSuffix(src_path, ".txt") {
+		return nil
+	}
 
-	cmd.Stdin = strings.NewReader(input)
+	parts := convertPath(src_path)
 
-	var out bytes.Buffer
-	cmd.Stdout = &out
+	cmd := exec.Command(WP_CLI_PATH+"/bin/wp", append(parts, "--man")...)
+	cmd.Dir = "/home/scribu/wp" // TODO
 
-	err := cmd.Run()
+	var stdout, stderr bytes.Buffer
+
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	err = cmd.Run()
+
 	if err != nil {
-		log.Fatal(err)
-	}
-
-	return out.String()
-}
-
-func getCommandsAsJSON() bytes.Buffer {
-	cmd := exec.Command(WP_CLI_PATH+"/bin/wp", "--cmd-dump")
-
-	var out bytes.Buffer
-	cmd.Stdout = &out
-
-	err := cmd.Run()
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	return out
-}
-
-func decodeJSON(out bytes.Buffer) Command {
-	dec := json.NewDecoder(bytes.NewReader(out.Bytes()))
-
-	var c Command
-
-	for {
-		if err := dec.Decode(&c); err == io.EOF {
-			break
-		} else if err != nil {
-			log.Fatal(err)
-		}
-	}
-
-	return c
-}
-
-func convertPath(cmd_path string) string {
-	cmd_path = strings.Replace(cmd_path, " ", "-", -1)
-	cmd_path = strings.Replace(cmd_path, "-wp-", "", 1)
-
-	return cmd_path
-}
-
-func getManSrc(cmd_path string) string {
-	src_path := path.Join(WP_CLI_PATH, "man-src", convertPath(cmd_path)+".txt")
-	f, err := os.Open(src_path)
-	if err != nil {
-		return ""
-	}
-
-	var b bytes.Buffer
-	b.ReadFrom(f)
-	f.Close()
-
-	return b.String()
-}
-
-func writeMan(contents, cmd_path string) {
-	final_path := path.Join(WP_CLI_PATH, "man", convertPath(cmd_path)+".1")
-	f, err := os.Create(final_path)
-	if err != nil {
-		log.Fatal("can't create ", final_path)
-	}
-
-	_, err = f.Write([]byte(contents))
-	if err != nil {
-		panic(err)
-	}
-}
-
-func handleCommand(cmd Command, path string) {
-	full_path := path + " " + cmd.Name
-
-	manSrc := getManSrc(full_path)
-
-	if "" != manSrc {
-		roff := strings.Replace(callRonn(manSrc), " \"January 2012\"", "", -1)
-		writeMan(roff, full_path)
-		log.Println("generated" + full_path)
+		log.Fatal(stderr.String())
 	} else {
-		for _, subcmd := range cmd.Subcommands {
-			handleCommand(subcmd, full_path)
-		}
+		log.Println(stdout.String())
 	}
+
+	return nil
 }
 
 func main() {
@@ -123,5 +53,5 @@ func main() {
 
 	WP_CLI_PATH = os.Args[1]
 
-	handleCommand(decodeJSON(getCommandsAsJSON()), "")
+	filepath.Walk(path.Join(WP_CLI_PATH, "man-src"), generateMan)
 }
