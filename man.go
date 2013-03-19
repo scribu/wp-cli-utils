@@ -1,4 +1,4 @@
-// Utility for concurently compiling all the man pages
+// Utility for concurrently compiling all the man pages
 
 package main
 
