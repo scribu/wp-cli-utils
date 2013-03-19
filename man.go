@@ -44,8 +44,9 @@ func unifyLastPart(parts []string) ([]string, error) {
 	return append(parts[:head], strings.Join(parts[head:], "-")), nil
 }
 
+func generateMan(src_path string, done chan bool) {
+	defer func() { done <- true }()
 
-func generateMan(src_path string) {
 	parts := convertPath(src_path)
 
 	for {
@@ -78,7 +79,13 @@ func main() {
 	files, err := filepath.Glob(path.Join(WP_CLI_PATH, "man-src/*.txt"))
 	if err != nil { panic(err) }
 
+	done := make(chan bool)
+
 	for _, file := range files {
-		generateMan(file)
+		go generateMan(file, done)
+	}
+
+	for i := len(files); i>0; i-- {
+		<-done
 	}
 }
