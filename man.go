@@ -4,6 +4,7 @@ package main
 
 import (
 	"bytes"
+	"errors"
 	"log"
 	"os"
 	"os/exec"
@@ -20,13 +21,7 @@ func convertPath(cmd_path string) []string {
 	return strings.Split(cmd_path, "-")
 }
 
-func generateMan(src_path string, f os.FileInfo, err error) error {
-	if !strings.HasSuffix(src_path, ".txt") {
-		return nil
-	}
-
-	parts := convertPath(src_path)
-
+func runCmd(parts []string) (bytes.Buffer, bytes.Buffer, error) {
 	cmd := exec.Command(WP_CLI_PATH+"/bin/wp", append(parts, "--man")...)
 	cmd.Dir = "/home/scribu/wp" // TODO
 
@@ -35,12 +30,43 @@ func generateMan(src_path string, f os.FileInfo, err error) error {
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 
-	err = cmd.Run()
+	err := cmd.Run()
 
-	if err != nil {
-		log.Fatal(stderr.String())
-	} else {
-		log.Println(stdout.String())
+	return stdout, stderr, err
+}
+
+func unifyLastPart(parts []string) ([]string, error) {
+	head := len(parts)-2
+	if head < 0 {
+		return parts, errors.New("Can't combine a single part")
+	}
+
+	return append(parts[:head], strings.Join(parts[head:], "-")), nil
+}
+
+func generateMan(src_path string, f os.FileInfo, err error) error {
+	if !strings.HasSuffix(src_path, ".txt") {
+		return nil
+	}
+
+	parts := convertPath(src_path)
+
+	for {
+		stdout, stderr, err := runCmd(parts)
+
+		if err == nil {
+			if "" == stdout.String() {
+				log.Println(parts)
+			}
+			log.Println(strings.Trim(stdout.String(), "\n"))
+			break
+		}
+
+		parts, err = unifyLastPart(parts)
+		if err != nil {
+			log.Fatal(stderr.String())
+			break
+		}
 	}
 
 	return nil
