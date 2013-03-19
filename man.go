@@ -4,69 +4,61 @@ package main
 
 import (
 	"bytes"
-	"errors"
+	"encoding/json"
+	"io"
 	"log"
 	"os"
 	"os/exec"
-	"path"
-	"path/filepath"
 	"strings"
 )
 
 var WP_CLI_PATH string
 
-func convertPath(cmd_path string) []string {
-	cmd_path = strings.Replace(path.Base(cmd_path), ".txt", "", 1)
-
-	return strings.Split(cmd_path, "-")
+type Command struct {
+	Name, Synopsis, Description string
+	Subcommands                 []Command
 }
 
-func runCmd(parts []string) (bytes.Buffer, bytes.Buffer, error) {
-	cmd := exec.Command(WP_CLI_PATH+"/bin/wp", append(parts, "--man")...)
-	cmd.Dir = "/home/scribu/wp" // TODO
+func getCommandsAsJSON() bytes.Buffer {
+	cmd := exec.Command(WP_CLI_PATH+"/bin/wp", "--cmd-dump")
 
-	var stdout, stderr bytes.Buffer
-
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
+	var out bytes.Buffer
+	cmd.Stdout = &out
 
 	err := cmd.Run()
-
-	return stdout, stderr, err
-}
-
-func unifyLastPart(parts []string) ([]string, error) {
-	head := len(parts)-2
-	if head < 0 {
-		return parts, errors.New("Can't combine a single part")
+	if err != nil {
+		log.Fatal(err)
 	}
 
-	return append(parts[:head], strings.Join(parts[head:], "-")), nil
+	return out
 }
 
-func generateMan(src_path string, done chan bool) {
-	defer func() { done <- true }()
+func decodeJSON(out bytes.Buffer) Command {
+	dec := json.NewDecoder(bytes.NewReader(out.Bytes()))
 
-	parts := convertPath(src_path)
+	var c Command
 
 	for {
-		stdout, stderr, err := runCmd(parts)
-
-		if err == nil {
-			if "" == stdout.String() {
-				log.Println(parts)
-			} else {
-				log.Println(strings.Trim(stdout.String(), "\n"))
-			}
+		if err := dec.Decode(&c); err == io.EOF {
 			break
-		}
-
-		parts, err = unifyLastPart(parts)
-		if err != nil {
-			log.Fatal(stderr.String())
-			break
+		} else if err != nil {
+			log.Fatal(err)
 		}
 	}
+
+	return c
+}
+
+func generateMan(part string, done chan bool) {
+	defer func() { done <- true }()
+
+	cmd := exec.Command(WP_CLI_PATH+"/bin/wp", part, "--man")
+	cmd.Dir = "/home/scribu/wp" // TODO
+
+	out, _ := cmd.CombinedOutput()
+
+	log.Println(part)
+	log.Println(strings.Trim(string(out), "\n"))
 }
 
 func main() {
@@ -76,16 +68,15 @@ func main() {
 
 	WP_CLI_PATH = os.Args[1]
 
-	files, err := filepath.Glob(path.Join(WP_CLI_PATH, "man-src/*.txt"))
-	if err != nil { panic(err) }
-
 	done := make(chan bool)
 
-	for _, file := range files {
-		go generateMan(file, done)
+	wp := decodeJSON(getCommandsAsJSON())
+
+	for _, cmd := range wp.Subcommands {
+		go generateMan(cmd.Name, done)
 	}
 
-	for i := len(files); i>0; i-- {
+	for i := len(wp.Subcommands); i > 0; i-- {
 		<-done
 	}
 }
