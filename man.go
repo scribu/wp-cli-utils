@@ -44,11 +44,8 @@ func unifyLastPart(parts []string) ([]string, error) {
 	return append(parts[:head], strings.Join(parts[head:], "-")), nil
 }
 
-func generateMan(src_path string, f os.FileInfo, err error) error {
-	if !strings.HasSuffix(src_path, ".txt") {
-		return nil
-	}
 
+func generateMan(src_path string) {
 	parts := convertPath(src_path)
 
 	for {
@@ -57,8 +54,9 @@ func generateMan(src_path string, f os.FileInfo, err error) error {
 		if err == nil {
 			if "" == stdout.String() {
 				log.Println(parts)
+			} else {
+				log.Println(strings.Trim(stdout.String(), "\n"))
 			}
-			log.Println(strings.Trim(stdout.String(), "\n"))
 			break
 		}
 
@@ -68,8 +66,6 @@ func generateMan(src_path string, f os.FileInfo, err error) error {
 			break
 		}
 	}
-
-	return nil
 }
 
 func main() {
@@ -79,5 +75,10 @@ func main() {
 
 	WP_CLI_PATH = os.Args[1]
 
-	filepath.Walk(path.Join(WP_CLI_PATH, "man-src"), generateMan)
+	files, err := filepath.Glob(path.Join(WP_CLI_PATH, "man-src/*.txt"))
+	if err != nil { panic(err) }
+
+	for _, file := range files {
+		generateMan(file)
+	}
 }
