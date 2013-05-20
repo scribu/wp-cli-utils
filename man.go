@@ -12,7 +12,7 @@ import (
 	"strings"
 )
 
-var WP_CLI_PATH, WP_PATH string
+var WP_CLI_PATH string
 
 type Command struct {
 	Name, Synopsis, Description string
@@ -53,7 +53,6 @@ func generateMan(part string, done chan bool) {
 	defer func() { done <- true }()
 
 	cmd := exec.Command(WP_CLI_PATH+"/bin/wp", "help", "--gen", part)
-	cmd.Dir = WP_PATH
 
 	out, _ := cmd.CombinedOutput()
 
@@ -62,12 +61,11 @@ func generateMan(part string, done chan bool) {
 }
 
 func main() {
-	if len(os.Args) < 3 {
-		log.Fatal("usage: man.go /path/to/wp-cli /path/to/wp-dir")
+	if len(os.Args) < 2 {
+		log.Fatal("usage: man.go /path/to/wp-cli")
 	}
 
 	WP_CLI_PATH = os.Args[1]
-	WP_PATH = os.Args[2]
 
 	done := make(chan bool)
 
