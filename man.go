@@ -52,7 +52,7 @@ func decodeJSON(out bytes.Buffer) Command {
 func generateMan(part string, done chan bool) {
 	defer func() { done <- true }()
 
-	cmd := exec.Command(WP_CLI_PATH+"/bin/wp", part, "--man")
+	cmd := exec.Command(WP_CLI_PATH+"/bin/wp", "help", "--gen", part)
 	cmd.Dir = WP_PATH
 
 	out, _ := cmd.CombinedOutput()
